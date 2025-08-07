@@ -10,6 +10,6 @@ with pkgs;
     text = ''
       set -e
       generate
-      kubectl apply -f yaml/crd.yaml
+      kubectl create -f yaml/crd.yaml
     '';
   }

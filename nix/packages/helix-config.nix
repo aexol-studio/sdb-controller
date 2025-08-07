@@ -1,5 +1,4 @@
 {
-  config,
   pkgs,
   rust-toolchain,
   ...
@@ -18,7 +17,10 @@ with pkgs; let
     "languages.toml" {
       language-server = {
         nil = {command = "${nil}/bin/nil";};
-        rust-analyzer = {command = "${rust-toolchain}/bin/rust-analyzer";};
+        rust-analyzer = {
+          command = "${rust-toolchain}/bin/rust-analyzer";
+          check.command = "${rust-toolchain}/bin/cargo clippy";
+        };
       };
       language = [
         {

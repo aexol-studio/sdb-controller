@@ -1,0 +1,11 @@
+[package]
+name = "tidb-api"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+k8s-openapi = { workspace = true, features=["latest", "schemars"] }
+schemars = { workspace = true }
+kube = { workspace = true, features = ["derive"] }
