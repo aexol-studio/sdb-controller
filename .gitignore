@@ -3,3 +3,7 @@
 controller
 audit
 audit.yaml
+.direnv
+.helix
+.pre-commit-config.yaml
+result

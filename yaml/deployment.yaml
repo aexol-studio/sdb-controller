@@ -1,73 +1,73 @@
 ---
-# Source: doc-controller/templates/networkpolicy.yaml
+# Source: sdb-controller/templates/networkpolicy.yaml
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: doc-controller
+  name: sdb-controller
   namespace: default
   labels:
-    app: doc-controller
-    app.kubernetes.io/name: doc-controller
-    app.kubernetes.io/version: "0.16.0"
+    app: sdb-controller
+    app.kubernetes.io/name: sdb-controller
+    app.kubernetes.io/version: "0.1.0"
 spec:
   podSelector:
     matchLabels:
-      app: doc-controller
+      app: sdb-controller
   policyTypes:
-  - Ingress
-  - Egress
+    - Ingress
+    - Egress
   egress:
 
-  # Kubernetes apiserver access
-  - to:
-    - ipBlock:
-        cidr: 0.0.0.0/0
-    ports:
-    - port: 443
-      protocol: TCP
-    - port: 6443
-      protocol: TCP
-  # DNS egress
-  - to:
-    - podSelector:
-        matchLabels:
-          k8s-app: kube-dns
-    ports:
-    - port: 53
-      protocol: UDP
+    # Kubernetes apiserver access
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 443
+          protocol: TCP
+        - port: 6443
+          protocol: TCP
+    # DNS egress
+    - to:
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
 
   ingress:
-  # prometheus metrics scraping support
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          name: monitoring
-      podSelector:
-        matchLabels:
-          app: prometheus
-    ports:
-    - port: http
-      protocol: TCP
+    # prometheus metrics scraping support
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+          podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - port: http
+          protocol: TCP
 ---
-# Source: doc-controller/templates/rbac.yaml
+# Source: sdb-controller/templates/rbac.yaml
 # Scoped service account
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: doc-controller
+  name: sdb-controller
   labels:
-    app: doc-controller
-    app.kubernetes.io/name: doc-controller
-    app.kubernetes.io/version: "0.16.0"
+    app: sdb-controller
+    app.kubernetes.io/name: sdb-controller
+    app.kubernetes.io/version: "0.1.0"
   namespace: default
 automountServiceAccountToken: true
 ---
-# Source: doc-controller/templates/rbac.yaml
+# Source: sdb-controller/templates/rbac.yaml
 # Access for the service account
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: doc-controller
+  name: sdb-controller
 rules:
   - apiGroups: ["kube.rs"]
     resources: ["documents", "documents/status", "documents/finalizers"]
@@ -76,90 +76,90 @@ rules:
     resources: ["events"]
     verbs: ["create"]
 ---
-# Source: doc-controller/templates/rbac.yaml
+# Source: sdb-controller/templates/rbac.yaml
 # Binding the role to the account
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: doc-controller
+  name: sdb-controller
 subjects:
-- kind: ServiceAccount
-  namespace: default
-  name: doc-controller
+  - kind: ServiceAccount
+    namespace: default
+    name: sdb-controller
 roleRef:
   kind: ClusterRole
-  name: doc-controller
+  name: sdb-controller
   apiGroup: rbac.authorization.k8s.io
 ---
-# Source: doc-controller/templates/service.yaml
+# Source: sdb-controller/templates/service.yaml
 # Expose the http port of the service
 apiVersion: v1
 kind: Service
 metadata:
-  name: doc-controller
+  name: sdb-controller
   namespace: default
   labels:
-    app: doc-controller
-    app.kubernetes.io/name: doc-controller
-    app.kubernetes.io/version: "0.16.0"
+    app: sdb-controller
+    app.kubernetes.io/name: sdb-controller
+    app.kubernetes.io/version: "0.1.0"
 spec:
   type: ClusterIP
   ports:
-  - port: 80
-    targetPort: 8080
-    protocol: TCP
-    name: http
+    - port: 80
+      targetPort: 8080
+      protocol: TCP
+      name: http
   selector:
-    app: doc-controller
+    app: sdb-controller
 ---
-# Source: doc-controller/templates/deployment.yaml
+# Source: sdb-controller/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: doc-controller
+  name: sdb-controller
   namespace: default
   labels:
-    app: doc-controller
-    app.kubernetes.io/name: doc-controller
-    app.kubernetes.io/version: "0.16.0"
+    app: sdb-controller
+    app.kubernetes.io/name: sdb-controller
+    app.kubernetes.io/version: "0.1.0"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: doc-controller
+      app: sdb-controller
   template:
     metadata:
       labels:
-        app: doc-controller
+        app: sdb-controller
       annotations:
-        kubectl.kubernetes.io/default-container: doc-controller
+        kubectl.kubernetes.io/default-container: sdb-controller
     spec:
-      serviceAccountName: doc-controller
+      serviceAccountName: sdb-controller
       securityContext:
         {}
       containers:
-      - name: doc-controller
-        image: ghcr.io/kube-rs/controller:0.16.0
-        imagePullPolicy: IfNotPresent
-        securityContext:
-          {}
-        resources:
-          limits:
-            cpu: 200m
-            memory: 256Mi
-          requests:
-            cpu: 50m
-            memory: 100Mi
-        ports:
-        - name: http
-          containerPort: 8080
-          protocol: TCP
-        env:
-        - name: RUST_LOG
-          value: info,kube=debug,controller=debug
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: http
-          initialDelaySeconds: 5
-          periodSeconds: 5
+        - name: sdb-controller
+          image: ghcr.io/kube-rs/controller:0.1.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            {}
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 100Mi
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: RUST_LOG
+              value: info,kube=debug,controller=debug
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5

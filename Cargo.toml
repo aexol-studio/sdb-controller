@@ -1,10 +1,12 @@
 [package]
 name = "controller"
-version = "0.16.0"
-authors = ["clux <sszynrae@gmail.com>"]
+version = "0.1.0"
+description = "Controller for in cluster management of surreal databases"
+homepage = "https://github.com/aexol-studio/sdb-controller"
+authors = ["dennor <kamil@aexol.com>"]
 edition = "2024"
 default-run = "controller"
-license = "Apache-2.0"
+license = "AGPL 3"
 publish = false
 
 [[bin]]

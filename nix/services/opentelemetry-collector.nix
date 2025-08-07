@@ -1,0 +1,3 @@
+{...}: {
+  opentelemetry-collector.enable = true;
+}

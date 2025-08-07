@@ -1,0 +1,15 @@
+name: pr-pipeline
+on:
+  pull_request:
+    branches:
+      - main
+jobs:
+  check-pr:
+    uses: ./.github/workflows/test-deploy-image.yaml
+    with:
+      registry-user: kamil@aexol.com
+      registry: registry.gitlab.aexol.com
+    secrets:
+      registry-password: ${{ secrets.DOCKER_TOKEN }}
+      ssh-key: |
+        ${{ secrets.GITLAB_AEXOL_SSH }}

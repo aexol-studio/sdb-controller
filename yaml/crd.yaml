@@ -9,49 +9,49 @@ spec:
     kind: Document
     plural: documents
     shortNames:
-    - doc
+      - doc
     singular: document
   scope: Namespaced
   versions:
-  - additionalPrinterColumns: []
-    name: v1
-    schema:
-      openAPIV3Schema:
-        description: Auto-generated derived type for DocumentSpec via `CustomResource`
-        properties:
-          spec:
-            description: |-
-              Generate the Kubernetes wrapper struct `Document` from our Spec and Status struct
+    - additionalPrinterColumns: []
+      name: v1
+      schema:
+        openAPIV3Schema:
+          description: Auto-generated derived type for DocumentSpec via `CustomResource`
+          properties:
+            spec:
+              description: |-
+                Generate the Kubernetes wrapper struct `Document` from our Spec and Status struct
 
-              This provides a hook for generating the CRD yaml (in crdgen.rs)
-              NB: CustomResource generates a pub struct Document here
-              To query for documents.kube.rs with kube, use Api<Document>.
-            properties:
-              content:
-                type: string
-              hide:
-                type: boolean
-              title:
-                type: string
-            required:
-            - content
-            - hide
-            - title
-            type: object
-          status:
-            description: The status object of `Document`
-            nullable: true
-            properties:
-              hidden:
-                type: boolean
-            required:
-            - hidden
-            type: object
-        required:
-        - spec
-        title: Document
-        type: object
-    served: true
-    storage: true
-    subresources:
-      status: {}
+                This provides a hook for generating the CRD yaml (in crdgen.rs)
+                NB: CustomResource generates a pub struct Document here
+                To query for documents.kube.rs with kube, use Api<Document>.
+              properties:
+                content:
+                  type: string
+                hide:
+                  type: boolean
+                title:
+                  type: string
+              required:
+                - content
+                - hide
+                - title
+              type: object
+            status:
+              description: The status object of `Document`
+              nullable: true
+              properties:
+                hidden:
+                  type: boolean
+              required:
+                - hidden
+              type: object
+          required:
+            - spec
+          title: Document
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}

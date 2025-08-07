@@ -15,6 +15,9 @@ pub enum Error {
 
     #[error("IllegalDocument")]
     IllegalDocument,
+
+    #[error("IllegalCluster")]
+    IllegalCluster,
 }
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -28,6 +31,10 @@ impl Error {
 pub mod controller;
 pub use crate::controller::*;
 
+// /// Expose all cluster components used by main
+// pub mod cluster;
+// pub use crate::cluster::*;
+
 /// Log and trace integrations
 pub mod telemetry;
 
@@ -35,4 +42,5 @@ pub mod telemetry;
 mod metrics;
 pub use metrics::Metrics;
 
-#[cfg(test)] pub mod fixtures;
+#[cfg(test)]
+pub mod fixtures;

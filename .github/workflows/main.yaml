@@ -1,0 +1,13 @@
+name: main
+on:
+  push:
+    branches:
+      - "main"
+jobs:
+  prod-deploy:
+    uses: ./.github/workflows/test-deploy-image.yaml
+    with:
+      registry-user: ${{ github.actor }}
+      registry: ghcr.io
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}
