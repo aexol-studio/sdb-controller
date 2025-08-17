@@ -1,4 +1,7 @@
-#![allow(unused_imports, unused_variables)]
+#[cfg(target_env = "musl")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use actix_web::{App, HttpRequest, HttpResponse, HttpServer, Responder, get, middleware, web::Data};
 pub use controller::{self, State, telemetry};
 
