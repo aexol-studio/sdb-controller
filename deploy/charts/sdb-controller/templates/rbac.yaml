@@ -1,0 +1,57 @@
+{{- if .Values.rbac.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "sdb-controller.fullname" . }}
+  labels:
+    {{- include "sdb-controller.labels" . | nindent 4 }}
+rules:
+  # Core: read config/secret, emit events
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["events.k8s.io"]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+
+  # Manage a Deployment owned by the controller
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # SurrealDB CRDs managed by this controller
+  - apiGroups: ["surrealdb.aexol.com"]
+    resources: ["clusters", "databases", "users"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["surrealdb.aexol.com"]
+    resources: ["clusters/status", "databases/status", "users/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["surrealdb.aexol.com"]
+    resources: ["clusters/finalizers", "databases/finalizers", "users/finalizers"]
+    verbs: ["update"]
+
+  # TiDB operator CRDs (optional)
+  {{- if .Values.tidbController.enabled }}
+  - apiGroups: ["pingcap.com"]
+    resources: ["tidbclusters"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["pingcap.com"]
+    resources: ["tidbclusters/status"]
+    verbs: ["get"]
+  {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "sdb-controller.fullname" . }}
+  labels:
+    {{- include "sdb-controller.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "sdb-controller.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "sdb-controller.fullname" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end -}}

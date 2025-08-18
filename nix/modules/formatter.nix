@@ -14,8 +14,8 @@
       };
       settings = {
         formatter.rustfmt.options = ["--config-path" "${../../rustfmt.toml}"];
-        formatter.deno.excludes = [".pre-commit-config.yaml" "charts/sdb-controller/**/*.yaml"];
-        global.excludes = [".envrc"];
+        formatter.deno.excludes = [".pre-commit-config.yaml" "deploy/charts/**"];
+        global.excludes = [".envrc" "deploy/charts/sdb-controller/templates/**"];
       };
     };
   };

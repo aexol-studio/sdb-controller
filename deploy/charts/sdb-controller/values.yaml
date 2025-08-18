@@ -1,0 +1,57 @@
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: ghcr.io/aexol-studio/sdb-controller
+  tag: "1755590250"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+rbac:
+  create: true
+
+podAnnotations: {}
+
+podSecurityContext: {}
+securityContext: {}
+
+affinity: {}
+nodeSelector: {}
+tolerations: []
+resources: {}
+
+env:
+  RUST_LOG: info
+  # TELEMETRY envs are auto-detected; override as needed
+
+metrics:
+  enabled: true
+  service:
+    type: ClusterIP
+    port: 9090
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    scrapeTimeout: 10s
+    additionalLabels: {}
+
+args: []
+
+extraEnv: []
+extraEnvFrom: []
+extraVolumes: []
+extraVolumeMounts: []
+
+# Optional TiDB controller-manager dependency
+# When enabled, Helm will pull/install the dependency chart.
+tidbController:
+  enabled: false
+  repository: https://charts.pingcap.org
+  version: "1.6.3"
+  values: {}

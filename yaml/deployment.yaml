@@ -3,22 +3,22 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: sdb-controller
-  namespace: default
+  name: release-name-sdb-controller
   labels:
-    app: sdb-controller
+    helm.sh/chart: sdb-controller-0.1.0
     app.kubernetes.io/name: sdb-controller
-    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: 0.1.0
+    app.kubernetes.io/managed-by: Helm
 spec:
   podSelector:
     matchLabels:
-      app: sdb-controller
+      app.kubernetes.io/name: sdb-controller
+      app.kubernetes.io/instance: release-name
   policyTypes:
     - Ingress
     - Egress
   egress:
-
-    # Kubernetes apiserver access
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
@@ -27,139 +27,162 @@ spec:
           protocol: TCP
         - port: 6443
           protocol: TCP
-    # DNS egress
-    - to:
-        - podSelector:
-            matchLabels:
-              k8s-app: kube-dns
-      ports:
-        - port: 53
-          protocol: UDP
-
+    - to: []
   ingress:
-    # prometheus metrics scraping support
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              name: monitoring
-          podSelector:
-            matchLabels:
-              app: prometheus
-      ports:
+    - ports:
         - port: http
           protocol: TCP
 ---
-# Source: sdb-controller/templates/rbac.yaml
-# Scoped service account
+# Source: sdb-controller/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: sdb-controller
+  name: release-name-sdb-controller
   labels:
-    app: sdb-controller
+    helm.sh/chart: sdb-controller-0.1.0
     app.kubernetes.io/name: sdb-controller
-    app.kubernetes.io/version: "0.1.0"
-  namespace: default
-automountServiceAccountToken: true
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: 0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    {}
 ---
 # Source: sdb-controller/templates/rbac.yaml
-# Access for the service account
-kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
 metadata:
-  name: sdb-controller
+  name: release-name-sdb-controller
+  labels:
+    helm.sh/chart: sdb-controller-0.1.0
+    app.kubernetes.io/name: sdb-controller
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: 0.1.0
+    app.kubernetes.io/managed-by: Helm
 rules:
-  - apiGroups: ["kube.rs"]
-    resources: ["documents", "documents/status", "documents/finalizers"]
-    verbs: ["get", "list", "watch", "patch", "update"]
+  # Core: read config/secret, emit events
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["events.k8s.io"]
     resources: ["events"]
-    verbs: ["create"]
+    verbs: ["create", "patch"]
+
+  # Manage a Deployment owned by the controller
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # SurrealDB CRDs managed by this controller
+  - apiGroups: ["surrealdb.aexol.com"]
+    resources: ["clusters", "databases", "users"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["surrealdb.aexol.com"]
+    resources: ["clusters/status", "databases/status", "users/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["surrealdb.aexol.com"]
+    resources: [
+      "clusters/finalizers",
+      "databases/finalizers",
+      "users/finalizers",
+    ]
+    verbs: ["update"]
+
+  # TiDB operator CRDs (optional)
 ---
 # Source: sdb-controller/templates/rbac.yaml
-# Binding the role to the account
-kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
 metadata:
-  name: sdb-controller
+  name: release-name-sdb-controller
+  labels:
+    helm.sh/chart: sdb-controller-0.1.0
+    app.kubernetes.io/name: sdb-controller
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: 0.1.0
+    app.kubernetes.io/managed-by: Helm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: release-name-sdb-controller
 subjects:
   - kind: ServiceAccount
-    namespace: default
-    name: sdb-controller
-roleRef:
-  kind: ClusterRole
-  name: sdb-controller
-  apiGroup: rbac.authorization.k8s.io
+    name: release-name-sdb-controller
+    namespace: sportxpert-dev
 ---
 # Source: sdb-controller/templates/service.yaml
-# Expose the http port of the service
 apiVersion: v1
 kind: Service
 metadata:
-  name: sdb-controller
-  namespace: default
+  name: release-name-sdb-controller
   labels:
-    app: sdb-controller
+    helm.sh/chart: sdb-controller-0.1.0
     app.kubernetes.io/name: sdb-controller
-    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: 0.1.0
+    app.kubernetes.io/managed-by: Helm
 spec:
   type: ClusterIP
-  ports:
-    - port: 80
-      targetPort: 8080
-      protocol: TCP
-      name: http
   selector:
-    app: sdb-controller
+    app.kubernetes.io/name: sdb-controller
+    app.kubernetes.io/instance: release-name
+  ports:
+    - name: http
+      port: 9090
+      targetPort: metrics
 ---
 # Source: sdb-controller/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sdb-controller
-  namespace: default
+  name: release-name-sdb-controller
   labels:
-    app: sdb-controller
+    helm.sh/chart: sdb-controller-0.1.0
     app.kubernetes.io/name: sdb-controller
-    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/instance: release-name
+    app.kubernetes.io/version: 0.1.0
+    app.kubernetes.io/managed-by: Helm
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: sdb-controller
+      app.kubernetes.io/name: sdb-controller
+      app.kubernetes.io/instance: release-name
   template:
     metadata:
       labels:
-        app: sdb-controller
+        helm.sh/chart: sdb-controller-0.1.0
+        app.kubernetes.io/name: sdb-controller
+        app.kubernetes.io/instance: release-name
+        app.kubernetes.io/version: 0.1.0
+        app.kubernetes.io/managed-by: Helm
       annotations:
-        kubectl.kubernetes.io/default-container: sdb-controller
+        {}
     spec:
-      serviceAccountName: sdb-controller
+      serviceAccountName: release-name-sdb-controller
       securityContext:
         {}
       containers:
-        - name: sdb-controller
-          image: ghcr.io/kube-rs/controller:0.1.0
+        - name: controller
+          image: "ghcr.io/aexol-studio/sdb-controller:latest"
           imagePullPolicy: IfNotPresent
-          securityContext:
-            {}
-          resources:
-            limits:
-              cpu: 200m
-              memory: 256Mi
-            requests:
-              cpu: 50m
-              memory: 100Mi
-          ports:
-            - name: http
-              containerPort: 8080
-              protocol: TCP
+          args:
+            []
           env:
             - name: RUST_LOG
-              value: info,kube=debug,controller=debug
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: http
-            initialDelaySeconds: 5
-            periodSeconds: 5
+              value: "info"
+          envFrom:
+          ports:
+            - name: metrics
+              containerPort: 9090
+          resources:
+            {}
+          volumeMounts:
+            []
+      volumes:
+        []
+      nodeSelector:
+        {}
+      affinity:
+        {}
+      tolerations:
+        []

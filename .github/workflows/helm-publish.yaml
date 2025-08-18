@@ -1,0 +1,30 @@
+name: Publish Helm Chart (OCI)
+
+on:
+  push:
+    tags:
+      - "chart/*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Package chart
+        run: |
+          CHART=deploy/charts/sdb-controller
+          VERSION=${GITHUB_REF_NAME#chart/}
+          helm dependency update $CHART || true
+          helm package $CHART --version "$VERSION" -d dist
+      - name: Push chart
+        run: |
+          VERSION=${GITHUB_REF_NAME#chart/}
+          helm push dist/sdb-controller-$VERSION.tgz oci://ghcr.io/${{ github.repository_owner }}/charts

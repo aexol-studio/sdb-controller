@@ -1,0 +1,10 @@
+Thank you for installing sdb-controller!
+
+Install notes:
+- CRDs are installed from the chart under crds/. They persist on uninstall by Helm design.
+- The controller runs in namespace: {{ .Release.Namespace }}
+
+To enable TiDB operator dependency next time:
+  helm upgrade --install {{ .Release.Name }} oci://ghcr.io/aexol-studio/charts/sdb-controller \
+    --namespace {{ .Release.Namespace }} --create-namespace \
+    --set tidbController.enabled=true

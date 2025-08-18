@@ -7,3 +7,5 @@ audit.yaml
 .helix
 .pre-commit-config.yaml
 result
+# Helm artifacts
+deploy/charts/**/charts/

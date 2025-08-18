@@ -1,0 +1,12 @@
+# Common VCS dirs
+.git/
+.hg/
+.svn/
+
+# IDEs
+.vscode/
+.idea/
+
+# Mac/windows
+.DS_Store
+Thumbs.db

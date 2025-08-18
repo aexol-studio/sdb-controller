@@ -1,0 +1,27 @@
+apiVersion: v2
+name: sdb-controller
+description: SurrealDB kube-rs controller
+kubeVersion: ">=1.24.0-0"
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+annotations:
+  artifacthub.io/category: database
+  artifacthub.io/prerelease: "true"
+  charts.openshift.io/name: sdb-controller
+  charts.openshift.io/provider: aexol-studio
+keywords:
+  - surrealdb
+  - controller
+  - operator
+sources:
+  - https://github.com/aexol-studio/sdb-controller
+home: https://github.com/aexol-studio/sdb-controller
+# Optional dependency on tidb-controller-manager via OCI
+# Users can override repository to OCI form and enable via values
+# Helm honors condition to skip pulling when disabled
+dependencies:
+  - name: tidb-operator
+    version: "1.6.3"
+    repository: https://charts.pingcap.org
+    condition: tidbController.enabled
