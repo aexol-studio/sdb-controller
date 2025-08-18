@@ -1,5 +1,5 @@
 //! Helper methods only available for tests
-use crate::{CLUSTER_FINALIZER, Cluster, Context, Result, Spec, Status};
+use crate::{CLUSTER_FINALIZER, Cluster, Context, Phase, Result, Spec, Status};
 use actix_web::body::MessageBody;
 use assert_json_diff::assert_json_include;
 use http::{Request, Response, StatusCode};
@@ -122,6 +122,12 @@ impl ApiServerVerifier {
                         .await
                         .unwrap()
                         .handle_delete_owned_secret(&cluster)
+                        .await
+                        .unwrap()
+                        .handle_get_owned_tidbcluster(&cluster)
+                        .await
+                        .unwrap()
+                        .handle_delete_owned_tidbcluster(&cluster)
                         .await
                         .unwrap()
                         .handle_event_create(reason)
@@ -260,6 +266,65 @@ impl ApiServerVerifier {
         Ok(self)
     }
 
+    async fn handle_get_owned_tidbcluster(mut self, cluster: &Cluster) -> Result<Self> {
+        let (req, send) = self.0.next_request().await.expect("service not called");
+        assert_eq!(req.method(), http::Method::GET);
+        assert!(
+            req.uri().to_string().contains(&format!(
+                "/apis/pingcap.com/v1alpha1/namespaces/default/tidbclusters/{}",
+                cluster.name_any()
+            )),
+            "unexpected tidbcluster get uri: {}",
+            req.uri()
+        );
+        let body = serde_json::json!({
+            "apiVersion": "pingcap.com/v1alpha1",
+            "kind": "TidbCluster",
+            "metadata": {
+                "name": cluster.name_any(),
+                "namespace": "default",
+                "ownerReferences": [{
+                    "apiVersion": Cluster::api_version(&()),
+                    "kind": Cluster::kind(&()),
+                    "name": cluster.name_any(),
+                    "uid": "0000-00-00-00-000000"
+                }]
+            },
+            "spec": {}
+        });
+        send.send_response(
+            Response::builder()
+                .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                .unwrap(),
+        );
+        Ok(self)
+    }
+
+    async fn handle_delete_owned_tidbcluster(mut self, cluster: &Cluster) -> Result<Self> {
+        let (req, send) = self.0.next_request().await.expect("service not called");
+        assert_eq!(req.method(), http::Method::DELETE);
+        assert!(
+            req.uri().to_string().contains(&format!(
+                "/apis/pingcap.com/v1alpha1/namespaces/default/tidbclusters/{}?",
+                cluster.name_any()
+            )),
+            "unexpected tidbcluster delete uri: {}",
+            req.uri()
+        );
+        let status = serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "Status",
+            "status": "Success",
+            "details": { "name": cluster.name_any(), "kind": "tidbclusters" }
+        });
+        send.send_response(
+            Response::builder()
+                .body(Body::from(serde_json::to_vec(&status).unwrap()))
+                .unwrap(),
+        );
+        Ok(self)
+    }
+
     // Accept a status patch setting a phase by string (e.g., "InCreation", "InProgress")
     async fn handle_status_patch_phase(mut self, cluster: Cluster, phase: &str) -> Result<Self> {
         let (req, send) = self.0.next_request().await.expect("service not called");
@@ -283,14 +348,14 @@ impl ApiServerVerifier {
         let mut echo = cluster.clone();
         echo.status = Some(Status {
             phase: match phase {
-                "New" => Some(super::Phase::New),
-                "Preparing" => Some(super::Phase::Preparing),
-                "InCreation" => Some(super::Phase::InCreation),
-                "InProgress" => Some(super::Phase::InProgress),
-                "NotReady" => Some(super::Phase::NotReady),
-                "Ready" => Some(super::Phase::Ready),
-                "Error" => Some(super::Phase::Error),
-                _ => Some(super::Phase::InProgress),
+                "New" => Some(Phase::New),
+                "Preparing" => Some(Phase::Preparing),
+                "InCreation" => Some(Phase::InCreation),
+                "InProgress" => Some(Phase::InProgress),
+                "NotReady" => Some(Phase::NotReady),
+                "Ready" => Some(Phase::Ready),
+                "Error" => Some(Phase::Error),
+                _ => Some(Phase::InProgress),
             },
             ..Default::default()
         });
@@ -631,8 +696,8 @@ impl ApiServerVerifier {
                 "name": format!("{}-surrealdb", cluster.name_any()),
                 "namespace": "default",
                 "ownerReferences": [{
-                    "apiVersion": super::Cluster::api_version(&()),
-                    "kind": super::Cluster::kind(&()),
+                    "apiVersion": Cluster::api_version(&()),
+                    "kind": Cluster::kind(&()),
                     "name": cluster.name_any(),
                     "uid": "0000-00-00-00-000000"
                 }]
@@ -665,8 +730,8 @@ impl ApiServerVerifier {
                 "name": format!("{}-surrealdb-root", cluster.name_any()),
                 "namespace": "default",
                 "ownerReferences": [{
-                    "apiVersion": super::Cluster::api_version(&()),
-                    "kind": super::Cluster::kind(&()),
+                    "apiVersion": Cluster::api_version(&()),
+                    "kind": Cluster::kind(&()),
                     "name": cluster.name_any(),
                     "uid": "0000-00-00-00-000000"
                 }]
@@ -695,8 +760,8 @@ impl ApiServerVerifier {
                 "name": format!("{}-surrealdb", cluster.name_any()),
                 "namespace":"default",
                 "ownerReferences":[{
-                    "apiVersion": super::Cluster::api_version(&()),
-                    "kind": super::Cluster::kind(&()),
+                    "apiVersion": Cluster::api_version(&()),
+                    "kind": Cluster::kind(&()),
                     "name": cluster.name_any(),
                     "uid":"0000-00-00-00-000000"
                 }]

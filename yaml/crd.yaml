@@ -20,12 +20,7 @@ spec:
           description: Auto-generated derived type for Spec via `CustomResource`
           properties:
             spec:
-              description: |-
-                Generate the Kubernetes wrapper struct `Cluster` from our Spec and Status struct
-
-                This provides a hook for generating the CRD yaml (in crdgen.rs)
-                NB: CustomResource generates a pub struct Cluster here
-                To query for clusters.surrealdb.aexol.com with kube, use Api<Cluster>.
+              description: Generate the Kubernetes wrapper struct `Cluster` from our Spec and Status struct
               properties:
                 replicas:
                   format: uint8
@@ -29632,6 +29627,73 @@ spec:
           required:
             - spec
           title: Cluster
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: databases.surrealdb.aexol.com
+spec:
+  group: surrealdb.aexol.com
+  names:
+    categories: []
+    kind: Database
+    plural: databases
+    shortNames:
+      - db
+    singular: database
+  scope: Namespaced
+  versions:
+    - additionalPrinterColumns: []
+      name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          description: Auto-generated derived type for DbSpec via `CustomResource`
+          properties:
+            spec:
+              properties:
+                clusterRef:
+                  properties:
+                    name:
+                      type: string
+                    namespace:
+                      nullable: true
+                      type: string
+                  required:
+                    - name
+                  type: object
+                dbName:
+                  nullable: true
+                  type: string
+                dbNamespace:
+                  nullable: true
+                  type: string
+              required:
+                - clusterRef
+              type: object
+            status:
+              nullable: true
+              properties:
+                message:
+                  nullable: true
+                  type: string
+                phase:
+                  enum:
+                    - New
+                    - InProgress
+                    - Ready
+                    - Error
+                    - null
+                  nullable: true
+                  type: string
+              type: object
+          required:
+            - spec
+          title: Database
           type: object
       served: true
       storage: true

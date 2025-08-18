@@ -8,7 +8,7 @@ use kube::{
 };
 use serde::Serialize;
 
-use crate::{Metrics, run_cluster};
+use crate::{Metrics, run_cluster, run_database};
 
 /// State shared between the controller and the web server
 #[derive(Clone, Default)]
@@ -59,5 +59,8 @@ impl Diagnostics {
 
 pub async fn run(state: State) {
     let client = Client::try_default().await.expect("failed to create kube Client");
-    join!(run_cluster(state.clone(), client.clone()));
+    join!(
+        run_cluster(state.clone(), client.clone()),
+        run_database(state.clone(), client.clone()),
+    );
 }

@@ -33,12 +33,13 @@
         + (
           if pkgs.stdenv.hostPlatform.system == "x86_64-linux"
           then ''
-            export CARGO_BUILD_TARGET="x86_64-unknown-linux-musl";
+            export CARGO_BUILD_TARGET="x86_64-unknown-linux-musl"
             # opt-level=1 is here due to few weird issues, serde_json macros without
             # optimizations overflow the stack while deserializing huge json. On the other hand,
             # if opt-level is set in Cargo.toml suddenly mimalloc starts being linked against
             # glibc.
-            export CARGO_BUILD_RUSTFLAGS="-C target-feature=+crt-static -C opt-level=1";
+            export CARGO_INCREMENTAL="true"
+            export CARGO_BUILD_RUSTFLAGS="-C target-feature=+crt-static -C opt-level=1 -C codegen-units=1024"
           ''
           else ''
           ''
