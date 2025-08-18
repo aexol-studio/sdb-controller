@@ -35,7 +35,11 @@ impl Error {
 
 /// Expose all cluster components used by main
 pub mod cluster;
-pub use crate::cluster::*;
+pub use crate::cluster::crd::*;
+
+/// Expose all database components used by main
+pub mod database;
+pub use crate::database::crd::*;
 
 /// Log and trace integrations
 pub mod telemetry;

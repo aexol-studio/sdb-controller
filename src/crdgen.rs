@@ -115,5 +115,8 @@ fn main() {
             );
         });
     }
-    print!("{}", serde_yaml::to_string(&crd).unwrap())
+    print!("{}", serde_yaml::to_string(&crd).unwrap());
+    println!("---");
+    let db_crd = controller::Database::crd();
+    println!("{}", serde_yaml::to_string(&db_crd).unwrap());
 }

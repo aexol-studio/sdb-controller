@@ -64,8 +64,7 @@ pub static CLUSTER_FINALIZER: &str = "clusters.surrealdb.aexol.com";
 pub static BOOTSTRAP_HTTP_SERVER_URL_ANNOTATION: &str = "surrealdb.aexol.com/bootstrap-url";
 
 /// Generate the Kubernetes wrapper struct `Cluster` from our Spec and Status struct
-#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
-#[cfg_attr(test, derive(Default))]
+#[derive(CustomResource, Deserialize, Serialize, Clone, Default, PartialEq, Debug, JsonSchema)]
 #[kube(
     kind = "Cluster",
     group = "surrealdb.aexol.com",
@@ -73,6 +72,8 @@ pub static BOOTSTRAP_HTTP_SERVER_URL_ANNOTATION: &str = "surrealdb.aexol.com/boo
     namespaced
 )]
 #[kube(status = "Status", shortname = "cluster")]
+#[kube(derive = "Default")]
+#[kube(derive = "PartialEq")]
 #[serde(rename_all = "camelCase")]
 pub struct Spec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -88,7 +89,7 @@ pub struct Spec {
 }
 
 /// The phase of `Cluster`
-#[derive(Deserialize, Serialize, Clone, Default, Debug, JsonSchema)]
+#[derive(Deserialize, Serialize, Clone, Default, Debug, JsonSchema, PartialEq)]
 pub enum Phase {
     #[default]
     New,
@@ -100,7 +101,7 @@ pub enum Phase {
     Error,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Default, PartialEq, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TidbClusterRef {
     pub name: String,
@@ -108,7 +109,7 @@ pub struct TidbClusterRef {
 }
 
 /// The status object of `Cluster`
-#[derive(Deserialize, Serialize, Clone, Default, Debug, JsonSchema)]
+#[derive(Deserialize, Serialize, Clone, Default, PartialEq, Debug, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Status {
     #[serde(default)]
@@ -824,8 +825,8 @@ pub async fn run_cluster(state: State, client: Client) {
 // Mock tests relying on fixtures.rs and its primitive apiserver mocks
 #[cfg(test)]
 mod test {
-    use super::{Api, Cluster, Context, Patch, PatchParams, Phase, PostParams, Resource, Secret, reconcile};
-    use crate::fixtures::{Scenario, timeout_after_1s};
+    use super::{Cluster, Context, Phase, reconcile};
+    use crate::cluster::fixtures::{Scenario, timeout_after_1s};
     use std::sync::Arc;
 
     #[tokio::test]
@@ -961,98 +962,5 @@ mod test {
 
         reconcile(Arc::new(cluster), testctx).await.expect("reconciler");
         timeout_after_1s(mocksrv).await;
-    }
-
-    #[tokio::test]
-    #[ignore = "requires a live Kubernetes cluster with CRD installed"]
-    async fn integration_one_node_tidb_tikv_cluster_reconcile() {
-        let client = kube::Client::try_default().await.unwrap();
-        let state = super::State::default();
-        let rec = state.diagnostics.read().await.recorder(client.clone());
-        let ctx = Arc::new(Context {
-            client: client.clone(),
-            recorder: rec,
-            metrics: state.metrics.clone(),
-            diagnostics: state.diagnostics.clone(),
-        });
-
-        let secrets: Api<Secret> = Api::namespaced(client.clone(), "default");
-        let _ = secrets
-            .create(
-                &PostParams::default(),
-                &Secret {
-                    metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
-                        name: Some("surreal-root".into()),
-                        namespace: Some("default".into()),
-                        ..Default::default()
-                    },
-                    type_: Some("Opaque".into()),
-                    string_data: Some(
-                        [
-                            ("user".to_string(), "root".to_string()),
-                            ("password".to_string(), "root".to_string()),
-                        ]
-                        .into_iter()
-                        .collect(),
-                    ),
-                    ..Default::default()
-                },
-            )
-            .await;
-
-        let mut cluster = super::Cluster::new(
-            "test",
-            super::Spec {
-                surrealdb_image: Some("surrealdb/surrealdb:latest".to_string()),
-                tidb_cluster: Some(super::TidbClusterSpec {
-                    version: Some("v8.5.1".into()),
-                    timezone: Some("UTC".into()),
-                    pd: Some(
-                        serde_json::from_value(serde_json::json!({
-                            "baseImage": "pingcap/pd",
-                            "replicas": 1,
-                            "requests": { "storage": "1Gi" },
-                            "config": {}
-                        }))
-                        .unwrap(),
-                    ),
-                    tikv: Some(
-                        serde_json::from_value(serde_json::json!({
-                            "baseImage": "pingcap/tikv",
-                            "replicas": 1,
-                            "requests": { "storage": "5Gi" },
-                            "config": {}
-                        }))
-                        .unwrap(),
-                    ),
-                    tidb: Some(
-                        serde_json::from_value(serde_json::json!({
-                            "baseImage": "pingcap/tidb",
-                            "replicas": 1,
-                            "service": { "type": "ClusterIP" },
-                            "config": {}
-                        }))
-                        .unwrap(),
-                    ),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        );
-        cluster.meta_mut().namespace = Some("default".into());
-        cluster.status = Some(super::Status {
-            phase: Some(super::Phase::New),
-            ..Default::default()
-        });
-
-        let clusters: Api<super::Cluster> = Api::namespaced(client.clone(), "default");
-        let pp = PatchParams::apply("sdb-controller");
-        let patch = Patch::Apply(cluster.clone());
-        let _ = clusters.patch("test", &pp, &patch).await.unwrap();
-
-        super::reconcile(Arc::new(cluster), ctx.clone()).await.unwrap();
-
-        let out = clusters.get_status("test").await.unwrap();
-        eprintln!("Cluster status after reconcile: {:?}", out.status);
     }
 }
