@@ -5,7 +5,7 @@ use tokio::time::sleep;
 
 #[tokio::test]
 #[ignore]
-async fn integration_cluster_then_database_becomes_ready() {
+async fn integration_cluster_database_user_flow() {
     let client = Client::try_default().await.expect("kube client");
 
     let secrets: Api<k8s_openapi::api::core::v1::Secret> = Api::namespaced(client.clone(), "default");
@@ -35,7 +35,7 @@ async fn integration_cluster_then_database_becomes_ready() {
     let clusters: Api<controller::Cluster> = Api::namespaced(client.clone(), "default");
     let mut cluster = controller::Cluster::new(
         "test",
-        controller::Spec {
+        controller::cluster::crd::Spec {
             surrealdb_image: Some("surrealdb/surrealdb:latest".to_string()),
             tidb_cluster: Some(tidb_api::tidbclusters::TidbClusterSpec {
                 version: Some("v8.5.1".into()),
@@ -73,8 +73,8 @@ async fn integration_cluster_then_database_becomes_ready() {
         },
     );
     cluster.meta_mut().namespace = Some("default".into());
-    cluster.status = Some(controller::Status {
-        phase: Some(controller::Phase::New),
+    cluster.status = Some(controller::cluster::crd::Status {
+        phase: Some(controller::cluster::crd::Phase::New),
         ..Default::default()
     });
 
@@ -85,7 +85,9 @@ async fn integration_cluster_then_database_becomes_ready() {
     for _ in 0..60 {
         // 60 * 5s = 300s
         if let Ok(obj) = clusters.get("test").await {
-            if obj.status.as_ref().and_then(|s| s.phase.clone()) == Some(controller::Phase::Ready) {
+            if obj.status.as_ref().and_then(|s| s.phase.clone())
+                == Some(controller::cluster::crd::Phase::Ready)
+            {
                 break;
             }
         }
@@ -94,6 +96,7 @@ async fn integration_cluster_then_database_becomes_ready() {
 
     // Create Database that references Cluster "test"
     let dbs: Api<controller::database::crd::Database> = Api::namespaced(client.clone(), "default");
+    let users: Api<controller::user::crd::User> = Api::namespaced(client.clone(), "default");
     let mut db = controller::database::crd::Database::new(
         "it-db",
         controller::database::crd::DbSpec {
@@ -111,13 +114,53 @@ async fn integration_cluster_then_database_becomes_ready() {
         .await
         .expect("create database");
 
+    let mut db_ready = false;
     for _ in 0..60 {
-        // 60 * 2s = 120s
         if let Ok(obj) = dbs.get("it-db").await {
             if obj.status.as_ref().and_then(|s| s.phase.clone())
                 == Some(controller::database::crd::DbPhase::Ready)
             {
+                db_ready = true;
+                break;
+            }
+        }
+        sleep(Duration::from_secs(2)).await;
+    }
+
+    if !db_ready {
+        panic!("Database did not become Ready in time");
+    }
+
+    // Create User that references Cluster and Database
+    let mut user = controller::user::crd::User::new(
+        "it-user",
+        controller::user::crd::UserSpec {
+            cluster_ref: controller::user::crd::ClusterRef {
+                name: "test".into(),
+                namespace: None,
+            },
+            database_ref: controller::user::crd::DatabaseRef {
+                name: "it-db".into(),
+                namespace: None,
+            },
+            username: None,
+            password: Some("s3cret-P@ss".into()),
+            secret_name: None,
+        },
+    );
+    user.meta_mut().namespace = Some("default".into());
+    let _ = users
+        .create(&PostParams::default(), &user)
+        .await
+        .expect("create user");
+
+    for _ in 0..60 {
+        if let Ok(obj) = users.get("it-user").await {
+            if obj.status.as_ref().and_then(|s| s.phase.clone())
+                == Some(controller::user::crd::UserPhase::Ready)
+            {
                 // cleanup
+                let _ = users.delete("it-user", &Default::default()).await;
                 let _ = dbs.delete("it-db", &Default::default()).await;
                 let _ = clusters.delete("test", &Default::default()).await;
                 return;
@@ -126,7 +169,8 @@ async fn integration_cluster_then_database_becomes_ready() {
         sleep(Duration::from_secs(2)).await;
     }
 
+    let _ = users.delete("it-user", &Default::default()).await;
     let _ = dbs.delete("it-db", &Default::default()).await;
     let _ = clusters.delete("test", &Default::default()).await;
-    panic!("Database did not become Ready in time");
+    panic!("User did not become Ready in time");
 }
