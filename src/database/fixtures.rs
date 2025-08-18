@@ -1,5 +1,7 @@
-use crate::Result;
-use crate::database::crd::{ClusterRef, Database, DbPhase, DbSpec, DbStatus};
+use crate::{
+    Result,
+    database::crd::{ClusterRef, Database, DbPhase, DbSpec, DbStatus},
+};
 use actix_web::body::MessageBody;
 use http::{Request, Response, StatusCode};
 use kube::{Client, Resource, ResourceExt, client::Body, runtime::events::Recorder};
@@ -352,8 +354,8 @@ impl ApiServerVerifier {
         assert_eq!(req.uri().path(), expected, "proxy path mismatch");
         let body = String::from_utf8(req.into_body().collect_bytes().await.unwrap().into()).unwrap();
         assert!(
-            body.contains("USE NS ") && body.contains("DEFINE DATABASE "),
-            "expected USE NS ...; DEFINE DATABASE ..., got: {body}"
+            body.contains("USE NS `") && body.contains("DEFINE DATABASE `"),
+            "expected quoted USE NS and DEFINE DATABASE, got: {body}"
         );
         send.send_response(
             Response::builder()

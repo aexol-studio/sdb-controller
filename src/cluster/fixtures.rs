@@ -1,5 +1,8 @@
 //! Helper methods only available for tests
-use crate::{CLUSTER_FINALIZER, Cluster, Context, Phase, Result, Spec, Status};
+use crate::{
+    Result,
+    cluster::crd::{CLUSTER_FINALIZER, Cluster, Context, Phase, Spec, Status},
+};
 use actix_web::body::MessageBody;
 use assert_json_diff::assert_json_include;
 use http::{Request, Response, StatusCode};

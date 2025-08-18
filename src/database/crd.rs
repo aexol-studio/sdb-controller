@@ -72,6 +72,7 @@ pub struct DbContext {
 async fn reconcile(db: Arc<Database>, ctx: Arc<DbContext>) -> Result<Action> {
     let ns = db.namespace().unwrap();
     let dbs: Api<Database> = Api::namespaced(ctx.client.clone(), &ns);
+    info!("Reconciling Database \"{}\" in {}", db.name_any(), ns);
     // drive a finalizer for potential future cleanup (we currently don't delete logical NS/DB)
     finalizer(&dbs, "databases.surrealdb.aexol.com", db, |event| async {
         match event {
@@ -164,7 +165,8 @@ impl Database {
         user: &str,
         pass: &str,
     ) -> Result<()> {
-        let sql = format!("DEFINE NAMESPACE {ns_name};");
+        let ns_q = format!("`{}`", ns_name.replace('`', "``"));
+        let sql = format!("DEFINE NAMESPACE {ns_q};");
         let path =
             format!("/api/v1/namespaces/{cluster_ns}/services/{cluster_name}-surrealdb:8000/proxy/sql");
         let req = Request::builder()
@@ -189,7 +191,9 @@ impl Database {
         user: &str,
         pass: &str,
     ) -> Result<()> {
-        let sql = format!("USE NS {ns_name}; DEFINE DATABASE {db_name};");
+        let ns_q = format!("`{}`", ns_name.replace('`', "``"));
+        let db_q = format!("`{}`", db_name.replace('`', "``"));
+        let sql = format!("USE NS {ns_q}; DEFINE DATABASE {db_q};");
         let path =
             format!("/api/v1/namespaces/{cluster_ns}/services/{cluster_name}-surrealdb:8000/proxy/sql");
         let req = Request::builder()

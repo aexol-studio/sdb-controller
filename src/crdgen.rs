@@ -119,4 +119,7 @@ fn main() {
     println!("---");
     let db_crd = controller::Database::crd();
     println!("{}", serde_yaml::to_string(&db_crd).unwrap());
+    println!("---");
+    let user_crd = controller::User::crd();
+    println!("{}", serde_yaml::to_string(&user_crd).unwrap());
 }
