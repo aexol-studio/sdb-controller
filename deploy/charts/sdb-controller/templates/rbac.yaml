@@ -6,10 +6,10 @@ metadata:
   labels:
     {{- include "sdb-controller.labels" . | nindent 4 }}
 rules:
-  # Core: read config/secret, emit events
+  # Core: read config/secret, emit events, manage services
   - apiGroups: [""]
-    resources: ["configmaps", "secrets"]
-    verbs: ["get", "list", "watch", "create", "update", "patch"]
+    resources: ["configmaps", "secrets", "services"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["events.k8s.io"]
     resources: ["events"]
     verbs: ["create", "patch"]
