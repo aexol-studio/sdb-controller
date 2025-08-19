@@ -34,7 +34,7 @@ rules:
   {{- if .Values.tidbController.enabled }}
   - apiGroups: ["pingcap.com"]
     resources: ["tidbclusters"]
-    verbs: ["get", "list", "watch", "update", "patch"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
   - apiGroups: ["pingcap.com"]
     resources: ["tidbclusters/status"]
     verbs: ["get"]
