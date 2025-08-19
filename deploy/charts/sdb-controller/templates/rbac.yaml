@@ -8,7 +8,7 @@ metadata:
 rules:
   # Core: read config/secret, emit events, manage services
   - apiGroups: [""]
-    resources: ["configmaps", "secrets", "services"]
+    resources: ["configmaps", "secrets", "services", "services/proxy"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["events.k8s.io"]
     resources: ["events"]
