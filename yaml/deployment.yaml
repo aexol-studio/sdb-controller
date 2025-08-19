@@ -62,7 +62,7 @@ rules:
   # Core: read config/secret, emit events
   - apiGroups: [""]
     resources: ["configmaps", "secrets"]
-    verbs: ["get", "list", "watch"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
   - apiGroups: ["events.k8s.io"]
     resources: ["events"]
     verbs: ["create", "patch"]
@@ -107,7 +107,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: release-name-sdb-controller
-    namespace: sportxpert-dev
+    namespace: default
 ---
 # Source: sdb-controller/templates/service.yaml
 apiVersion: v1
@@ -163,7 +163,7 @@ spec:
         {}
       containers:
         - name: controller
-          image: "ghcr.io/aexol-studio/sdb-controller:latest"
+          image: "ghcr.io/aexol-studio/sdb-controller:1755590250"
           imagePullPolicy: IfNotPresent
           args:
             []

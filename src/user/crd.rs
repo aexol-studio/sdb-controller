@@ -97,7 +97,9 @@ mod test {
             phase: Some(UserPhase::New),
             message: None,
         });
-        let handle = server.run(Scenario::NewCreatesUserAndSecretDefaultNames(user.clone()));
+        let handle = server.run(Scenario::NewCreatesUserAndSecretAndConfigMapDefaultNames(
+            user.clone(),
+        ));
         super::reconcile(Arc::new(user), ctx).await.expect("reconciled");
         timeout_after_1s(handle).await;
     }
@@ -145,7 +147,7 @@ impl User {
         Ok(())
     }
 
-    async fn ensure_secret(&self, ctx: Arc<UserContext>, username: &str, password: &str) -> Result<String> {
+    async fn ensure_secret(&self, ctx: Arc<UserContext>, password: &str) -> Result<String> {
         use k8s_openapi::api::core::v1::Secret;
         use kube::api::PostParams;
         let ns = self.namespace().unwrap();
@@ -156,10 +158,6 @@ impl User {
             .unwrap_or_else(|| format!("{}-credentials", self.name_any()));
         let secrets: Api<Secret> = Api::namespaced(ctx.client.clone(), &ns);
         let mut data = std::collections::BTreeMap::new();
-        data.insert(
-            "username".to_string(),
-            k8s_openapi::ByteString(username.as_bytes().to_vec()),
-        );
         data.insert(
             "password".to_string(),
             k8s_openapi::ByteString(password.as_bytes().to_vec()),
@@ -179,6 +177,46 @@ impl User {
             ..Default::default()
         };
         match secrets.create(&PostParams::default(), &sec).await {
+            Ok(_) => {}
+            Err(kube::Error::Api(ae)) if ae.code == 409 => {}
+            Err(e) => return Err(Error::KubeError(e)),
+        }
+        Ok(name)
+    }
+
+    async fn ensure_configmap(
+        &self,
+        ctx: Arc<UserContext>,
+        username: &str,
+        cluster_ns: &str,
+        cluster_name: &str,
+    ) -> Result<String> {
+        use k8s_openapi::api::core::v1::ConfigMap;
+        use kube::api::PostParams;
+        let ns = self.namespace().unwrap();
+        let name = format!("{}-config", self.name_any());
+        let cms: Api<ConfigMap> = Api::namespaced(ctx.client.clone(), &ns);
+        let url = format!("http://{cluster_name}-surrealdb.{cluster_ns}.svc:8000");
+        let data: std::collections::BTreeMap<String, String> = [
+            ("username".to_string(), username.to_string()),
+            ("url".to_string(), url),
+        ]
+        .into_iter()
+        .collect();
+        let cm = ConfigMap {
+            metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
+                name: Some(name.clone()),
+                namespace: Some(ns.clone()),
+                owner_references: self.controller_owner_ref(&()).map(|mut o| {
+                    let _ = o.controller.replace(true);
+                    vec![o]
+                }),
+                ..Default::default()
+            },
+            data: Some(data),
+            ..Default::default()
+        };
+        match cms.create(&PostParams::default(), &cm).await {
             Ok(_) => {}
             Err(kube::Error::Api(ae)) if ae.code == 409 => {}
             Err(e) => return Err(Error::KubeError(e)),
@@ -318,11 +356,23 @@ impl User {
                     .ok();
                     return Ok(Action::requeue(Duration::from_secs(20)));
                 }
-                // Ensure secret
-                if let Err(e) = self.ensure_secret(ctx.clone(), username, &password).await {
+                if let Err(e) = self.ensure_secret(ctx.clone(), &password).await {
                     self.set_phase_msg(ctx.clone(), UserPhase::Error, Some(format!("secret failed: {e}")))
                         .await
                         .ok();
+                    return Ok(Action::requeue(Duration::from_secs(20)));
+                }
+                if let Err(e) = self
+                    .ensure_configmap(ctx.clone(), username, cluster_ns, cluster_name)
+                    .await
+                {
+                    self.set_phase_msg(
+                        ctx.clone(),
+                        UserPhase::Error,
+                        Some(format!("configmap failed: {e}")),
+                    )
+                    .await
+                    .ok();
                     return Ok(Action::requeue(Duration::from_secs(20)));
                 }
                 self.set_phase_msg(ctx.clone(), UserPhase::Ready, None).await.ok();

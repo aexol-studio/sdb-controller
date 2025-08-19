@@ -54,7 +54,7 @@ pub struct ApiServerVerifier(ApiServerHandle);
 
 pub enum Scenario {
     FinalizerCreation(User),
-    NewCreatesUserAndSecretDefaultNames(User),
+    NewCreatesUserAndSecretAndConfigMapDefaultNames(User),
 }
 
 pub async fn timeout_after_1s(handle: tokio::task::JoinHandle<()>) {
@@ -74,7 +74,7 @@ impl ApiServerVerifier {
         tokio::spawn(async move {
             match scenario {
                 Scenario::FinalizerCreation(u) => self.handle_finalizer_creation(u).await,
-                Scenario::NewCreatesUserAndSecretDefaultNames(u) => {
+                Scenario::NewCreatesUserAndSecretAndConfigMapDefaultNames(u) => {
                     self.handle_get_database(&u)
                         .await
                         .unwrap()
@@ -88,6 +88,9 @@ impl ApiServerVerifier {
                         .await
                         .unwrap()
                         .handle_create_secret(&u)
+                        .await
+                        .unwrap()
+                        .handle_create_configmap(&u)
                         .await
                 }
             }
@@ -222,6 +225,36 @@ impl ApiServerVerifier {
         assert!(name.ends_with("-credentials"), "unexpected secret name: {name}");
         let resp = serde_json::json!({
             "apiVersion":"v1","kind":"Secret","metadata":{"name": name}
+        });
+        send.send_response(
+            Response::builder()
+                .status(StatusCode::CREATED)
+                .body(Body::from(serde_json::to_vec(&resp).unwrap()))
+                .unwrap(),
+        );
+        Ok(self)
+    }
+
+    async fn handle_create_configmap(mut self, user: &User) -> Result<Self> {
+        let (req, send) = self.0.next_request().await.expect("service not called");
+        assert_eq!(req.method(), http::Method::POST);
+        assert!(req.uri().to_string().contains(&format!(
+            "/api/v1/namespaces/{}/configmaps?",
+            user.namespace().unwrap()
+        )));
+        let body = read_json(req.into_body()).await;
+        let meta = body.get("metadata").unwrap();
+        let name = meta.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        assert!(name.ends_with("-config"), "unexpected configmap name: {name}");
+        // check data keys
+        let data = body
+            .get("data")
+            .and_then(|d| d.as_object())
+            .expect("data present");
+        assert!(data.contains_key("username"));
+        assert!(data.contains_key("url"));
+        let resp = serde_json::json!({
+            "apiVersion":"v1","kind":"ConfigMap","metadata":{"name": name}
         });
         send.send_response(
             Response::builder()
