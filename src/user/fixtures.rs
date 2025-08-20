@@ -293,7 +293,11 @@ impl UserContextMock {
     pub fn test() -> (Arc<crate::user::crd::UserContext>, ApiServerVerifier) {
         let (svc, handle) = tower_test::mock::pair::<Request<Body>, Response<Body>>();
         let client = Client::new(svc, "default");
-        let ctx = crate::user::crd::UserContext { client };
+        let service_client = crate::service::Client::new(client.clone());
+        let ctx = crate::user::crd::UserContext {
+            client,
+            service_client,
+        };
         (Arc::new(ctx), ApiServerVerifier(handle))
     }
 }

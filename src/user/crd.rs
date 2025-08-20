@@ -1,4 +1,4 @@
-use crate::{Cluster, Database, Error, Result, run::State};
+use crate::{Cluster, Database, Error, Result, run::State, service::Client as ServiceClient};
 
 use futures::StreamExt;
 use kube::{
@@ -108,6 +108,7 @@ mod test {
 #[derive(Clone)]
 pub struct UserContext {
     pub client: Client,
+    pub service_client: ServiceClient,
 }
 
 impl UserSpec {
@@ -196,7 +197,7 @@ impl User {
         let ns = self.namespace().unwrap();
         let name = format!("{}-config", self.name_any());
         let cms: Api<ConfigMap> = Api::namespaced(ctx.client.clone(), &ns);
-        let url = format!("http://{cluster_name}-surrealdb.{cluster_ns}.svc:8000");
+        let url = format!("http://{cluster_name}-surrealdb.{cluster_ns}.svc.cluster.local:8000");
         let data: std::collections::BTreeMap<String, String> = [
             ("username".to_string(), username.to_string()),
             ("url".to_string(), url),
@@ -268,11 +269,10 @@ impl User {
         db_name: &str,
         username: &str,
         password: &str,
-        root_user: &str,
-        root_pass: &str,
+        user: &str,
+        pass: &str,
     ) -> Result<()> {
-        use http::header::{ACCEPT, CONTENT_TYPE};
-        use http::{Method, Request};
+        use http::header::HeaderValue;
         let ns_q = format!("`{}`", ns_name.replace('`', "``"));
         let db_q = format!("`{}`", db_name.replace('`', "``"));
         let user_q = format!("`{}`", username.replace('`', "``"));
@@ -280,20 +280,16 @@ impl User {
         let sql = format!(
             "USE NS {ns_q}; USE DB {db_q}; DEFINE USER {user_q} ON DATABASE PASSWORD '{pw_esc}' ROLES EDITOR;"
         );
-        let path =
-            format!("/api/v1/namespaces/{cluster_ns}/services/{cluster_name}-surrealdb:8000/proxy/sql");
-        let req = Request::builder()
-            .method(Method::POST)
-            .header(ACCEPT, http::HeaderValue::from_static("application/json"))
-            .header(CONTENT_TYPE, http::HeaderValue::from_static("text/plain"))
-            .header(
-                http::header::AUTHORIZATION,
-                Self::basic_auth_header(root_user, root_pass),
-            )
-            .uri(path)
-            .body(sql.into_bytes())
-            .map_err(Error::HTTPError)?;
-        ctx.client.request_text(req).await.map_err(Error::KubeError)?;
+        let cli = &ctx.service_client;
+        let req = cli
+            .post(&format!(
+                "http://{cluster_name}-surrealdb.{cluster_ns}.svc.cluster.local:8000/sql"
+            ))?
+            .header(http::header::ACCEPT, HeaderValue::from_static("application/json"))
+            .header(http::header::CONTENT_TYPE, HeaderValue::from_static("text/plain"))
+            .header(http::header::AUTHORIZATION, Self::basic_auth_header(user, pass))
+            .body(sql.into_bytes())?;
+        cli.send(req).await?;
         Ok(())
     }
 
@@ -406,7 +402,7 @@ fn error_policy(_user: Arc<super::crd::User>, _err: &Error, _ctx: Arc<UserContex
     Action::requeue(Duration::from_secs(60))
 }
 
-pub async fn run_user(_state: State, client: Client) {
+pub async fn run_user(_state: State, client: Client, service_client: ServiceClient) {
     let users = Api::<super::crd::User>::all(client.clone());
     if let Err(e) = users.list(&ListParams::default().limit(1)).await {
         error!("User CRD is not queryable; {e:?}");
@@ -414,7 +410,14 @@ pub async fn run_user(_state: State, client: Client) {
     }
     Controller::new(users.clone(), Config::default().any_semantic())
         .shutdown_on_signal()
-        .run(reconcile, error_policy, Arc::new(UserContext { client }))
+        .run(
+            reconcile,
+            error_policy,
+            Arc::new(UserContext {
+                client,
+                service_client,
+            }),
+        )
         .for_each(|_| futures::future::ready(()))
         .await;
 }

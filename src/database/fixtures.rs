@@ -404,9 +404,11 @@ impl DbContextMock {
     pub fn test() -> (Arc<crate::database::crd::DbContext>, ApiServerVerifier) {
         let (svc, handle) = tower_test::mock::pair::<Request<Body>, Response<Body>>();
         let client = Client::new(svc, "default");
+        let service_client = crate::service::Client::new(client.clone());
         let rec = Recorder::new(client.clone(), "database-ctrl-test".into());
         let ctx = crate::database::crd::DbContext {
             client,
+            service_client,
             recorder: rec,
         };
         (Arc::new(ctx), ApiServerVerifier(handle))

@@ -24,6 +24,15 @@ pub enum Error {
 
     #[error("MissingRootCredentials")]
     MissingRootCredentials,
+
+    #[error("service request error: {0}")]
+    ServiceRequestError(String),
+
+    #[error("reqwest error: {0}")]
+    ReqwestError(#[source] reqwest::Error),
+
+    #[error("url parse error: {0}")]
+    URLParseError(#[source] url::ParseError),
 }
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -51,6 +60,8 @@ pub mod telemetry;
 /// Run all controllers
 pub mod run;
 pub use run::*;
+
+pub(crate) mod service;
 
 /// Metrics
 mod metrics;

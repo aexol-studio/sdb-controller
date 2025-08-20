@@ -59,9 +59,12 @@ impl Diagnostics {
 
 pub async fn run(state: State) {
     let client = Client::try_default().await.expect("failed to create kube Client");
+    let svc_client = crate::service::Client::try_default()
+        .await
+        .expect("failed to create a service client for kubernetes");
     join!(
         crate::cluster::crd::run_cluster(state.clone(), client.clone()),
-        crate::database::crd::run_database(state.clone(), client.clone()),
-        crate::user::crd::run_user(state.clone(), client.clone()),
+        crate::database::crd::run_database(state.clone(), client.clone(), svc_client.clone()),
+        crate::user::crd::run_user(state.clone(), client.clone(), svc_client.clone()),
     );
 }

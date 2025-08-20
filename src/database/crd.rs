@@ -1,7 +1,7 @@
-use crate::{Cluster, Error, Result, run::State};
+use crate::{Cluster, Error, Result, run::State, service::Client as ServiceClient};
 use base64::Engine;
 use futures::StreamExt;
-use http::{HeaderValue, Method, Request};
+use http::HeaderValue;
 use kube::{
     CustomResource, Resource,
     api::{Api, ListParams, Patch, PatchParams, ResourceExt},
@@ -65,6 +65,7 @@ pub struct ClusterRef {
 #[derive(Clone)]
 pub struct DbContext {
     pub client: Client,
+    pub service_client: ServiceClient,
     pub recorder: Recorder,
 }
 
@@ -169,15 +170,16 @@ impl Database {
         let sql = format!("DEFINE NAMESPACE {ns_q};");
         let path =
             format!("/api/v1/namespaces/{cluster_ns}/services/{cluster_name}-surrealdb:8000/proxy/sql");
-        let req = Request::builder()
-            .method(Method::POST)
+        let cli = &ctx.service_client;
+        let req = cli
+            .post(&format!(
+                "http://{cluster_name}-surrealdb.{cluster_ns}.svc.cluster.local:8000/sql"
+            ))?
             .header(http::header::ACCEPT, HeaderValue::from_static("application/json"))
             .header(http::header::CONTENT_TYPE, HeaderValue::from_static("text/plain"))
             .header(http::header::AUTHORIZATION, Self::basic_auth_header(user, pass))
-            .uri(path)
-            .body(sql.into_bytes())
-            .map_err(Error::HTTPError)?;
-        ctx.client.request_text(req).await.map_err(Error::KubeError)?;
+            .body(sql.into_bytes())?;
+        cli.send(req).await?;
         Ok(())
     }
 
@@ -194,17 +196,16 @@ impl Database {
         let ns_q = format!("`{}`", ns_name.replace('`', "``"));
         let db_q = format!("`{}`", db_name.replace('`', "``"));
         let sql = format!("USE NS {ns_q}; DEFINE DATABASE {db_q};");
-        let path =
-            format!("/api/v1/namespaces/{cluster_ns}/services/{cluster_name}-surrealdb:8000/proxy/sql");
-        let req = Request::builder()
-            .method(Method::POST)
+        let cli = &ctx.service_client;
+        let req = cli
+            .post(&format!(
+                "http://{cluster_name}-surrealdb.{cluster_ns}.svc.cluster.local:8000/sql"
+            ))?
             .header(http::header::ACCEPT, HeaderValue::from_static("application/json"))
             .header(http::header::CONTENT_TYPE, HeaderValue::from_static("text/plain"))
             .header(http::header::AUTHORIZATION, Self::basic_auth_header(user, pass))
-            .uri(path)
-            .body(sql.into_bytes())
-            .map_err(Error::HTTPError)?;
-        ctx.client.request_text(req).await.map_err(Error::KubeError)?;
+            .body(sql.into_bytes())?;
+        cli.send(req).await?;
         Ok(())
     }
 
@@ -279,7 +280,7 @@ impl Database {
     }
 }
 
-pub async fn run_database(state: State, client: Client) {
+pub async fn run_database(state: State, client: Client, service_client: ServiceClient) {
     let dbs = Api::<Database>::all(client.clone());
     if let Err(e) = dbs.list(&ListParams::default().limit(1)).await {
         error!("Database CRD is not queryable; {e:?}");
@@ -293,6 +294,7 @@ pub async fn run_database(state: State, client: Client) {
             error_policy,
             Arc::new(DbContext {
                 client: client.clone(),
+                service_client,
                 recorder: rec,
             }),
         )
