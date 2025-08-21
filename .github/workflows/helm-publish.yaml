@@ -2,11 +2,12 @@ name: Publish Helm Chart (OCI)
 
 on:
   push:
-    tags:
-      - "chart/*"
+    paths:
+      - "deploy/charts/sdb-controller/Chart.yaml"
 
 jobs:
   publish:
+    if: contains(github.event.head_commit.message, '[skip chart]') == false
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -16,15 +17,31 @@ jobs:
       - uses: azure/setup-helm@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install yq
+        uses: mikefarah/yq@v4.44.3
+        with:
+          cmd: yq --version
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
-      - name: Package chart
+      - name: Detect version change
+        id: ver
         run: |
           CHART=deploy/charts/sdb-controller
-          VERSION=${GITHUB_REF_NAME#chart/}
-          helm dependency update $CHART || true
-          helm package $CHART --version "$VERSION" -d dist
-      - name: Push chart
+          VERSION=$(yq -r .version "$CHART/Chart.yaml")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          if ! git show HEAD^:"$CHART/Chart.yaml" >/dev/null 2>&1; then echo "changed=true" >> $GITHUB_OUTPUT; exit 0; fi
+          PREV=$(git show HEAD^:"$CHART/Chart.yaml" | yq -r .version)
+          if [ "$VERSION" != "$PREV" ]; then echo "changed=true" >> $GITHUB_OUTPUT; else echo "changed=false" >> $GITHUB_OUTPUT; fi
+      - name: Package chart
+        if: steps.ver.outputs.changed == 'true'
         run: |
-          VERSION=${GITHUB_REF_NAME#chart/}
+          CHART=deploy/charts/sdb-controller
+          VERSION=$(yq -r .version "$CHART/Chart.yaml")
+          helm dependency update "$CHART" || true
+          helm package "$CHART" --version "$VERSION" -d dist
+      - name: Push chart
+        if: steps.ver.outputs.changed == 'true'
+        run: |
+          CHART=deploy/charts/sdb-controller
+          VERSION=$(yq -r .version "$CHART/Chart.yaml")
           helm push dist/sdb-controller-$VERSION.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
