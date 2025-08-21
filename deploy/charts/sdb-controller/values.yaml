@@ -3,7 +3,7 @@ fullnameOverride: ""
 
 image:
   repository: ghcr.io/aexol-studio/sdb-controller
-  tag: "1755610918"
+  tag: "1755717546"
   pullPolicy: IfNotPresent
 
 replicaCount: 1
